@@ -7,6 +7,7 @@ N2 = 1.4;
 theta1 = 1:90;
 Rp = [];
 Rt = [];
+schlicks = [];
 
 for theta=1:90
     i = (theta / 180) * pi;
@@ -21,10 +22,19 @@ for theta=1:90
     end
 end
 
+NormInc = Rp(1);
+for theta=1:90
+    i = (theta / 180) * pi;
+    
+    schlicks(theta) = NormInc + (1 - NormInc) * (1 - cos(i))^5;
+end
+
+length(schlicks)
+
 figure;
 title ('N1 = 1.0, N2 = 1.4');
-plot(theta1, Rt, theta1, Rp);
-legend('Rt','Rp');
+plot(theta1, Rt, theta1, Rp, theta1, schlicks);
+legend('Rt','Rp', 'shlicks');
 axis([0,90,0,1]);
 
 %Exiting material
@@ -48,6 +58,7 @@ for theta=1:2881
     end
     
 end
+
 figure;
 title ('N1 = 1.0, N2 = 1.4');
 plot(theta1, Rt, theta1, Rp);
