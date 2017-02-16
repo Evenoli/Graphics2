@@ -51,7 +51,17 @@ def LoadPFMAndSavePPM(in_path, out_path):
     height,width,_ = img_in.shape
     for y in range(height):
         for x in range(width):
-            img_out[y,x,:] = img_in[y,x,:] * 255.0
+            [a, b, c] = img_in[y,x,:]
+            if a > 1:
+                a = 1.0
+            a = a * 255.0
+            if b > 1:
+                b = 1.0
+            b = b * 255.0
+            if c > 1.0:
+                c = 1.0
+            c = c * 255.0
+            img_out[y, x] = [a, b, c]
 
     writePPM(out_path, img_out.astype(np.uint8))
 
@@ -63,12 +73,11 @@ def GenerateSamples(numberOfSamples):
     em_intensity = np.empty(shape=(height, width, 1))
     #fill em_intensity with em values st I = R+G+B /3
     # colTotals = np.empty(shape=(width, 1))
-    rowTotals = np.empty(shape=(height, 1))
+    rowTotals = np.zeros(shape=(height, 1))
     print "Bringing map into intensity space"
     for row in range(height):
         for col in range(width):
             em_intensity[row, col] = float((em[row, col, 0] + em[row, col, 1] + em[row, col, 2])) /3.0
-            print em[row, col]
             #Scale by solid angle term sin(theta)
             theta = (float(row)/float(height)) * np.pi
             em_intensity[row, col] = em_intensity[row, col] * np.sin(theta)
@@ -80,8 +89,6 @@ def GenerateSamples(numberOfSamples):
     acrossRowSum = 0.0
     for i in range(height):
         acrossRowSum = acrossRowSum + rowTotals[i]
-    #This non-deterministically returns nan or some negative thing, should return ~177953 i think, no idea why its doing this
-    print acrossRowSum
     #Generate PDF
     chooseRowPDF = np.empty(shape=(height, 1))
     for i in range(height):
@@ -108,16 +115,24 @@ def GenerateSamples(numberOfSamples):
             if col != 0:
                 per_row[row, col] = per_row[row, col] + per_row[row, col-1]
 
+    neighbours = lambda x, y : [(x2, y2) for x2 in range(x-1, x+2)
+                               for y2 in range(y-1, y+2)
+                               if (-1 < x < height and
+                                   -1 < y < width and
+                                   (x != x2 or y != y2) and
+                                   (0 <= x2 < height) and
+                                   (0 <= y2 < width))]
+
     #Begin sampling
     print "Sampling" + str(numberOfSamples)
     randRow = np.random.rand(numberOfSamples)
-    sampledIndices = np.empty(shape=(numberOfSamples, 2))
+    sampledIndices = np.zeros(shape=(numberOfSamples, 2))
     for s in range(numberOfSamples):
         i = 0
         found = False
         while not found:
             if chooseRowPDF[i] >= randRow[s]:
-                sampledIndices[s, 1] = i
+                sampledIndices[s, 1] = int(i)
                 found = True
             i = i+1
         i = 0
@@ -125,67 +140,26 @@ def GenerateSamples(numberOfSamples):
         randPixelInRow = np.random.rand(1)
         while not found:
             if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
-                sampledIndices[s, 0] = i
+                sampledIndices[s, 0] = int(i)
                 found = True
             i = i+1
         #Highlight pixel in pfm map
-        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1]
-
-    writePFM("sampled_map_" + str(numberOfSamples), em)
-
-    numberOfSamples = 256
-    print "Sampling" + str(numberOfSamples)
-    randRow = np.random.rand(numberOfSamples)
-    sampledIndices = np.empty(shape=(numberOfSamples, 2))
-    for s in range(numberOfSamples):
-        i = 0
-        found = False
-        while not found:
-            if chooseRowPDF[i] >= randRow[s]:
-                sampledIndices[s, 1] = i
-                found = True
-            i = i+1
-        i = 0
-        found = False
-        randPixelInRow = np.random.rand(1)
-        while not found:
-            if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
-                sampledIndices[s, 0] = i
-                found = True
-            i = i+1
-        #Highlight pixel in pfm map
-        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1]
-
-    writePFM("sampled_map_" + str(numberOfSamples), em)
-
-    numberOfSamples = 1024
-    print "Sampling" + str(numberOfSamples)
-    randRow = np.random.rand(numberOfSamples)
-    sampledIndices = np.empty(shape=(numberOfSamples, 2))
-    for s in range(numberOfSamples):
-        i = 0
-        found = False
-        while not found:
-            if chooseRowPDF[i] >= randRow[s]:
-                sampledIndices[s, 1] = i
-                found = True
-            i = i+1
-        i = 0
-        found = False
-        randPixelInRow = np.random.rand(1)
-        while not found:
-            if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
-                sampledIndices[s, 0] = i
-                found = True
-            i = i+1
-        #Highlight pixel in pfm map
-        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1.0]
+        row = sampledIndices[s, 1]
+        col = sampledIndices[s, 0]
+        em[row, col] = [0,0,1.0]
         #highlight neightbours
+        pixels = neighbours(int(row), int(col))
+        for i in range(len(pixels)):
+            em[pixels[i]] = [0, 0, 1.0]
+            nextPixels = neighbours(pixels[i][0], pixels[i][1])
+            for j in range(len(nextPixels)):
+                em[nextPixels[j]] = [0,0,1.0]
 
-    writePFM("sampled_map_" + str(numberOfSamples), em)
+    writePFM("sampled_map_" + str(numberOfSamples) + ".pfm", em)
+    LoadPFMAndSavePPM("sampled_map_" + str(numberOfSamples) + ".pfm", "sampled_map_" + str(numberOfSamples) + ".ppm")
 
 GenerateSamples(64)
-# GenerateSamples(256)
-# GenerateSamples(1024)
+GenerateSamples(256)
+GenerateSamples(1024)
 if '__main__' == __name__:
     pass
