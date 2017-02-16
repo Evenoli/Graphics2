@@ -1,0 +1,191 @@
+import sys
+import numpy as np
+from PNM import *
+
+def CreateAndSavePFM(out_path):
+    width = 512
+    height = 512
+    numComponents = 3
+
+    img_out = np.empty(shape=(width, height, numComponents), dtype=np.float32)
+    
+    for y in range(height):
+        for x in range(width):
+            img_out[y,x,:] = 1.0
+
+    writePFM(out_path, img)
+
+def LoadAndSavePPM(in_path, out_path):
+    img_in = loadPPM(in_path)
+    img_out = np.empty(shape=img_in.shape, dtype=img_in.dtype)
+    height,width,_ = img_in.shape # Retrieve height and width
+    for y in range(height):
+        for x in range(width):
+            img_out[y,x,:] = img_in[y,x,:] # Copy pixels
+
+    writePPM(out_path, img_out)
+
+def LoadAndSavePFM(in_path, out_path):
+    img_in = loadPFM(in_path)
+    img_out = np.empty(shape=img_in.shape, dtype=img_in.dtype)
+    height,width,_ = img_in.shape # Retrieve height and width
+    for y in range(height):
+        for x in range(width):
+            img_out[y,x,:] = img_in[y,x,:] # Copy pixels
+
+    writePFM(out_path, img_out)
+
+def LoadPPMAndSavePFM(in_path, out_path):
+    img_in = loadPPM(in_path)
+    img_out = np.empty(shape=img_in.shape, dtype=np.float32)
+    height,width,_ = img_in.shape
+    for y in range(height):
+        for x in range(width):
+            img_out[y,x,:] = img_in[y,x,:]/255.0
+
+    writePFM(out_path, img_out)
+            
+def LoadPFMAndSavePPM(in_path, out_path):
+    img_in = loadPFM(in_path)
+    img_out = np.empty(shape=img_in.shape, dtype=np.float32)
+    height,width,_ = img_in.shape
+    for y in range(height):
+        for x in range(width):
+            img_out[y,x,:] = img_in[y,x,:] * 255.0
+
+    writePPM(out_path, img_out.astype(np.uint8))
+
+#Part 2
+def GenerateSamples(numberOfSamples):
+    #Load Grace Environment map
+    em = loadPFM("grace_latlong.pfm")
+    height, width,_ = em.shape
+    em_intensity = np.empty(shape=(height, width, 1))
+    #fill em_intensity with em values st I = R+G+B /3
+    # colTotals = np.empty(shape=(width, 1))
+    rowTotals = np.empty(shape=(height, 1))
+    print "Bringing map into intensity space"
+    for row in range(height):
+        for col in range(width):
+            em_intensity[row, col] = float((em[row, col, 0] + em[row, col, 1] + em[row, col, 2])) /3.0
+            print em[row, col]
+            #Scale by solid angle term sin(theta)
+            theta = (float(row)/float(height)) * np.pi
+            em_intensity[row, col] = em_intensity[row, col] * np.sin(theta)
+            # print em_intensity[row, col]
+            # colTotals[col] = colTotals[col] + em_intensity[row, col]
+            rowTotals[row] = rowTotals[row] + em_intensity[row, col]
+    #Create 1D CDF across rows to select one specific row
+    print "Creating across row pdf/cdf"
+    acrossRowSum = 0.0
+    for i in range(height):
+        acrossRowSum = acrossRowSum + rowTotals[i]
+    #This non-deterministically returns nan or some negative thing, should return ~177953 i think, no idea why its doing this
+    print acrossRowSum
+    #Generate PDF
+    chooseRowPDF = np.empty(shape=(height, 1))
+    for i in range(height):
+        chooseRowPDF[i] = rowTotals[i]/acrossRowSum
+    #Generate CDF
+    for i in range(height):
+        if i != 0:
+            chooseRowPDF[i] = chooseRowPDF[i] + chooseRowPDF[i-1]
+
+
+    #Seperately create one 1D CDF for every row of the EM to select a pixel within that row
+    print "Creating per row cdf/pdf"
+    per_row = np.empty(shape=(height, width, 1))
+    for i in range(height):
+        for j in range(width):
+            #rowTotals[0] = 0 as sin(0) = 0 so not dividing
+            if i == 0:
+                per_row[i, j] = 1.0/width
+            else:
+                per_row[i, j] = em_intensity[i, j]/rowTotals[i]
+    #Generate CDF
+    for col in range(width):
+        for row in range(height):
+            if col != 0:
+                per_row[row, col] = per_row[row, col] + per_row[row, col-1]
+
+    #Begin sampling
+    print "Sampling" + str(numberOfSamples)
+    randRow = np.random.rand(numberOfSamples)
+    sampledIndices = np.empty(shape=(numberOfSamples, 2))
+    for s in range(numberOfSamples):
+        i = 0
+        found = False
+        while not found:
+            if chooseRowPDF[i] >= randRow[s]:
+                sampledIndices[s, 1] = i
+                found = True
+            i = i+1
+        i = 0
+        found = False
+        randPixelInRow = np.random.rand(1)
+        while not found:
+            if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
+                sampledIndices[s, 0] = i
+                found = True
+            i = i+1
+        #Highlight pixel in pfm map
+        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1]
+
+    writePFM("sampled_map_" + str(numberOfSamples), em)
+
+    numberOfSamples = 256
+    print "Sampling" + str(numberOfSamples)
+    randRow = np.random.rand(numberOfSamples)
+    sampledIndices = np.empty(shape=(numberOfSamples, 2))
+    for s in range(numberOfSamples):
+        i = 0
+        found = False
+        while not found:
+            if chooseRowPDF[i] >= randRow[s]:
+                sampledIndices[s, 1] = i
+                found = True
+            i = i+1
+        i = 0
+        found = False
+        randPixelInRow = np.random.rand(1)
+        while not found:
+            if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
+                sampledIndices[s, 0] = i
+                found = True
+            i = i+1
+        #Highlight pixel in pfm map
+        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1]
+
+    writePFM("sampled_map_" + str(numberOfSamples), em)
+
+    numberOfSamples = 1024
+    print "Sampling" + str(numberOfSamples)
+    randRow = np.random.rand(numberOfSamples)
+    sampledIndices = np.empty(shape=(numberOfSamples, 2))
+    for s in range(numberOfSamples):
+        i = 0
+        found = False
+        while not found:
+            if chooseRowPDF[i] >= randRow[s]:
+                sampledIndices[s, 1] = i
+                found = True
+            i = i+1
+        i = 0
+        found = False
+        randPixelInRow = np.random.rand(1)
+        while not found:
+            if per_row[sampledIndices[s, 1], i] >= randPixelInRow[0]:
+                sampledIndices[s, 0] = i
+                found = True
+            i = i+1
+        #Highlight pixel in pfm map
+        em[sampledIndices[s, 1], sampledIndices[s, 0]] = [0,0,1.0]
+        #highlight neightbours
+
+    writePFM("sampled_map_" + str(numberOfSamples), em)
+
+GenerateSamples(64)
+# GenerateSamples(256)
+# GenerateSamples(1024)
+if '__main__' == __name__:
+    pass
