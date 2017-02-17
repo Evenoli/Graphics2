@@ -89,31 +89,37 @@ def GenerateSamples(numberOfSamples):
     acrossRowSum = 0.0
     for i in range(height):
         acrossRowSum = acrossRowSum + rowTotals[i]
-    #Generate PDF
+    #Generate PDF --------------------------------------------------------->NEEDED IN PART 3 as p(x)
     chooseRowPDF = np.empty(shape=(height, 1))
     for i in range(height):
         chooseRowPDF[i] = rowTotals[i]/acrossRowSum
     #Generate CDF
+    chooseRowCDF = np.zeros(shape=(height, 1))
     for i in range(height):
         if i != 0:
-            chooseRowPDF[i] = chooseRowPDF[i] + chooseRowPDF[i-1]
+            chooseRowCDF[i] = chooseRowPDF[i] + chooseRowPDF[i-1]
+        else:
+            chooseRowCDF[i] = chooseRowPDF[i]
 
 
     #Seperately create one 1D CDF for every row of the EM to select a pixel within that row
     print "Creating per row cdf/pdf"
-    per_row = np.empty(shape=(height, width, 1))
+    per_row_pdf = np.empty(shape=(height, width, 1))
     for i in range(height):
         for j in range(width):
             #rowTotals[0] = 0 as sin(0) = 0 so not dividing
             if i == 0:
-                per_row[i, j] = 1.0/width
+                per_row_pdf[i, j] = 1.0/width
             else:
-                per_row[i, j] = em_intensity[i, j]/rowTotals[i]
+                per_row_pdf[i, j] = em_intensity[i, j]/rowTotals[i]
     #Generate CDF
+    per_row = np.empty(shape=(height, width, 1))
     for col in range(width):
         for row in range(height):
             if col != 0:
-                per_row[row, col] = per_row[row, col] + per_row[row, col-1]
+                per_row[row, col] = per_row_pdf[row, col] + per_row_pdf[row, col-1]
+            else:
+                per_row[row, col] = per_row_pdf[row, col]
 
     neighbours = lambda x, y : [(x2, y2) for x2 in range(x-1, x+2)
                                for y2 in range(y-1, y+2)
