@@ -158,6 +158,42 @@ def GenerateSamples(numberOfSamples):
     writePFM("sampled_map_" + str(numberOfSamples) + ".pfm", em)
     LoadPFMAndSavePPM("sampled_map_" + str(numberOfSamples) + ".pfm", "sampled_map_" + str(numberOfSamples) + ".ppm")
 
+    return sampledIndices
+
+#Part 3
+def RenderDiffuseSphere(numberOfSamples, sampledIndices):
+    img_in = loadPFM("grace_latlong.pfm")
+
+    radius = 255.5
+    sphereWidth = 511
+    sphereHeight = 511
+    sphere = np.empty((sphereWidth, sphereHeight, 3), dtype=float32)
+
+    height, width, _ = img_in.shape
+
+    for w in range(sphereWidth):
+        for h in range(sphereHeight):
+            if (h - radius)**2 + (w - radius)**2 <= radius**2:
+                x = (w - radius)/radius
+                y = (radius - h)/radius
+                z = np.sqrt(1.0 - x**2 - y**2)
+                normal = normalize([x, y, z])
+
+                for s in range(numberOfSamples):
+                    i, j = sampledIndices[s]
+
+                    #Polar (t) and azimuthal (p) angles
+                    t = (float(i)/float(height))*np.pi
+                    p = (float(j)/float(width))*np.pi*2
+
+                    #Reflection vector
+                    [a,b,c] = normalize([math.sin(t)*math.sin(p)/radius, math.cos(t)/radius, math.cos(p)*math.sin(t)/radius])
+
+                    cosTheta = np.dot(normal, [a,b,c])
+
+            else:
+                sphere[h,w,:] = np.array([0.0, 0.0, 0.0])
+
 GenerateSamples(64)
 GenerateSamples(256)
 GenerateSamples(1024)
