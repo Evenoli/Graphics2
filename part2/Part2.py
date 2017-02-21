@@ -65,6 +65,12 @@ def LoadPFMAndSavePPM(in_path, out_path):
 
     writePPM(out_path, img_out.astype(np.uint8))
 
+def normalize(v):
+    norm=np.linalg.norm(v)
+    if norm==0: 
+       return v
+    return v/norm
+
 #Part 2
 def GenerateSamples(numberOfSamples):
     #Load Grace Environment map
@@ -90,14 +96,14 @@ def GenerateSamples(numberOfSamples):
     for i in range(height):
         acrossRowSum = acrossRowSum + rowTotals[i]
     #Generate PDF --------------------------------------------------------->NEEDED IN PART 3 as p(x)
-    chooseRowPDF = np.empty(shape=(height, 1))
+    chooseRowPDF = np.zeros(shape=(height, 1))
     for i in range(height):
         chooseRowPDF[i] = rowTotals[i]/acrossRowSum
     #Generate CDF
     chooseRowCDF = np.zeros(shape=(height, 1))
     for i in range(height):
         if i != 0:
-            chooseRowCDF[i] = chooseRowPDF[i] + chooseRowPDF[i-1]
+            chooseRowCDF[i] = chooseRowPDF[i] + chooseRowCDF[i-1]
         else:
             chooseRowCDF[i] = chooseRowPDF[i]
 
@@ -117,7 +123,7 @@ def GenerateSamples(numberOfSamples):
     for col in range(width):
         for row in range(height):
             if col != 0:
-                per_row[row, col] = per_row_pdf[row, col] + per_row_pdf[row, col-1]
+                per_row[row, col] = per_row_pdf[row, col] + per_row[row, col-1]
             else:
                 per_row[row, col] = per_row_pdf[row, col]
 
@@ -137,7 +143,7 @@ def GenerateSamples(numberOfSamples):
         i = 0
         found = False
         while not found:
-            if chooseRowPDF[i] >= randRow[s]:
+            if chooseRowCDF[i] >= randRow[s]:
                 sampledIndices[s, 1] = int(i)
                 found = True
             i = i+1
@@ -164,16 +170,16 @@ def GenerateSamples(numberOfSamples):
     writePFM("sampled_map_" + str(numberOfSamples) + ".pfm", em)
     LoadPFMAndSavePPM("sampled_map_" + str(numberOfSamples) + ".pfm", "sampled_map_" + str(numberOfSamples) + ".ppm")
 
-    return sampledIndices
+    return sampledIndices, chooseRowCDF, per_row_pdf
 
 #Part 3
-def RenderDiffuseSphere(numberOfSamples, sampledIndices):
+def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowCDF, per_row_pdf):
     img_in = loadPFM("grace_latlong.pfm")
-
+    print("Building diffuse shpere")
     radius = 255.5
     sphereWidth = 511
     sphereHeight = 511
-    sphere = np.empty((sphereWidth, sphereHeight, 3), dtype=float32)
+    sphere = np.empty((sphereWidth, sphereHeight, 3), dtype=np.float32)
 
     height, width, _ = img_in.shape
 
@@ -185,23 +191,43 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices):
                 z = np.sqrt(1.0 - x**2 - y**2)
                 normal = normalize([x, y, z])
 
+                pixelSum = [0,0,0]
                 for s in range(numberOfSamples):
                     i, j = sampledIndices[s]
-
                     #Polar (t) and azimuthal (p) angles
-                    t = (float(i)/float(height))*np.pi
-                    p = (float(j)/float(width))*np.pi*2
+                    t = (float(j)/float(height))*np.pi
+                    p = (float(i)/float(width))*np.pi*2
 
                     #Reflection vector
-                    [a,b,c] = normalize([math.sin(t)*math.sin(p)/radius, math.cos(t)/radius, math.cos(p)*math.sin(t)/radius])
+                    [a,b,c] = normalize([-np.sin(t)*np.sin(p)/radius, np.cos(t)/radius, -np.cos(p)*np.sin(t)/radius])
 
                     cosTheta = np.dot(normal, [a,b,c])
+
+                    pxy = chooseRowCDF[j] * per_row_pdf[j,i]
+                    
+                    if(cosTheta > 0):
+                        pixelSum[:] += normalize(((1.0/np.pi) * cosTheta * img_in[j,i,:]) / pxy)
+
+                sphere[w,h,0] = pixelSum[0] / float(numberOfSamples)
+                sphere[w,h,1] = pixelSum[1] / float(numberOfSamples)
+                sphere[w,h,2] = pixelSum[2] / float(numberOfSamples)
+                # print(sphere[w,h])
 
             else:
                 sphere[h,w,:] = np.array([0.0, 0.0, 0.0])
 
-GenerateSamples(64)
-GenerateSamples(256)
-GenerateSamples(1024)
+    writePFM("part3_"+str(numberOfSamples)+".pfm", sphere)
+    LoadPFMAndSavePPM("part3_"+str(numberOfSamples)+".pfm", "part3_"+str(numberOfSamples)+".ppm")
+
+indicies,rowPDF,perRowPDF = GenerateSamples(64)
+RenderDiffuseSphere(64, indicies,rowPDF,perRowPDF)
+
+indicies,rowPDF,perRowPDF = GenerateSamples(256)
+RenderDiffuseSphere(256, indicies,rowPDF,perRowPDF)
+
+indicies,rowPDF,perRowPDF = GenerateSamples(1024)
+RenderDiffuseSphere(1024, indicies,rowPDF,perRowPDF)
+#GenerateSamples(256)
+#GenerateSamples(1024)
 if '__main__' == __name__:
     pass
