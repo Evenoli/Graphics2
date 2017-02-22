@@ -170,10 +170,10 @@ def GenerateSamples(numberOfSamples):
     writePFM("sampled_map_" + str(numberOfSamples) + ".pfm", em)
     LoadPFMAndSavePPM("sampled_map_" + str(numberOfSamples) + ".pfm", "sampled_map_" + str(numberOfSamples) + ".ppm")
 
-    return sampledIndices, chooseRowCDF, per_row_pdf
+    return sampledIndices, chooseRowPDF, per_row_pdf
 
 #Part 3
-def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowCDF, per_row_pdf):
+def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_pdf):
     img_in = loadPFM("grace_latlong.pfm")
     print("Building diffuse shpere")
     radius = 255.5
@@ -184,6 +184,8 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowCDF, per_row_p
     height, width, _ = img_in.shape
 
     for w in range(sphereWidth):
+        if(w%10 == 0):
+            print(w)
         for h in range(sphereHeight):
             if (h - radius)**2 + (w - radius)**2 <= radius**2:
                 x = (w - radius)/radius
@@ -203,7 +205,7 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowCDF, per_row_p
 
                     cosTheta = np.dot(normal, [a,b,c])
 
-                    pxy = chooseRowCDF[j] * per_row_pdf[j,i]
+                    pxy = chooseRowPDF[j] * per_row_pdf[j,i]
                     
                     if(cosTheta > 0):
                         pixelSum[:] += normalize(((1.0/np.pi) * cosTheta * img_in[j,i,:]) / pxy)
@@ -219,11 +221,11 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowCDF, per_row_p
     writePFM("part3_"+str(numberOfSamples)+".pfm", sphere)
     LoadPFMAndSavePPM("part3_"+str(numberOfSamples)+".pfm", "part3_"+str(numberOfSamples)+".ppm")
 
-indicies,rowPDF,perRowPDF = GenerateSamples(64)
-RenderDiffuseSphere(64, indicies,rowPDF,perRowPDF)
+# indicies,rowPDF,perRowPDF = GenerateSamples(64)
+# RenderDiffuseSphere(64, indicies,rowPDF,perRowPDF)
 
-indicies,rowPDF,perRowPDF = GenerateSamples(256)
-RenderDiffuseSphere(256, indicies,rowPDF,perRowPDF)
+# indicies,rowPDF,perRowPDF = GenerateSamples(256)
+# RenderDiffuseSphere(256, indicies,rowPDF,perRowPDF)
 
 indicies,rowPDF,perRowPDF = GenerateSamples(1024)
 RenderDiffuseSphere(1024, indicies,rowPDF,perRowPDF)
