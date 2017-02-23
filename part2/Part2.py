@@ -187,17 +187,16 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
     height, width, _ = img_in.shape
 
     for w in range(sphereWidth):
-        if(w%10 == 0):
+        if(w%50 == 0):
             print(w)
         for h in range(sphereHeight):
             if (h - radius)**2 + (w - radius)**2 <= radius**2:
                 x = (w - radius)/radius
                 y = (radius - h)/radius
                 z = np.sqrt(1.0 - x**2 - y**2)
-                normal = normalize([x, y, z])
+                normal = normalize(np.array([x, y, z]))
 
-                pixelSum = np.zeros(3)
-                # cosTheta = np.dot(normal, calculateReflectionFor([0,0,1], normal))
+                pixelSum = np.zeros(3, dtype=np.float32)
 
                 for s in range(numberOfSamples):
                     i, j = sampledIndices[s]
@@ -205,14 +204,11 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
                     theta = (float(j)/float(height))*np.pi
                     phi = (float(i)/float(width))*np.pi*2
 
-                    a = -np.sin(theta)*np.cos(phi)
-                    b = np.cos(theta)
-                    c = -np.sin(theta)*np.sin(phi)
+                    a = -np.sin(theta)*np.cos(phi)*radius
+                    b = np.cos(theta)*radius
+                    c = np.sin(theta)*np.sin(phi)*radius
 
-                    #Reflection vector
-                    # [a,b,c] = normalize([-np.sin(t)*np.cos(p)*radius, np.cos(t)*radius, np.sin(p)*np.sin(t)*radius])
-
-                    cosTheta = np.dot(normal, [a,b,c])
+                    cosTheta = np.dot(normal, normalize(np.array([a,b,c])))
 
                     if(useProb):
                         if(cosTheta > 0):
@@ -226,17 +222,13 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
                             colNorm[2] = img_in[j,i,2] / norm
 
                             v = (1.0/np.pi) * cosTheta * I * colNorm[:] / pxy
-                            pixelSum[:] += v[:] / np.sum(v)
+                            pixelSum += v #/ np.sum()
                     else:
                         if(cosTheta > 0):
-                            v = (1.0/np.pi) * cosTheta * img_in[j,i,:]
-                            pixelSum[:] += v[:] / np.sum(v)
+                            v = (1.0/np.pi) * cosTheta * img_in[j,i]
+                            pixelSum += v #/ np.sum(v)
 
-                sphere[w,h,0] = pixelSum[0] / float(numberOfSamples)
-                sphere[w,h,1] = pixelSum[1] / float(numberOfSamples)
-                sphere[w,h,2] = pixelSum[2] / float(numberOfSamples)
-                # sphere[w,h,:] = normalize(sphere[w,h,:])
-                # print(sphere[w,h])
+                sphere[w,h] = pixelSum / float(numberOfSamples)
 
             else:
                 sphere[h,w,:] = np.array([0.0, 0.0, 0.0])
@@ -248,26 +240,96 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
         writePFM("part3_"+str(numberOfSamples)+".pfm", sphere)
         LoadPFMAndSavePPM("part3_"+str(numberOfSamples)+".pfm", "part3_"+str(numberOfSamples)+".ppm")
 
+def LinearToneMap(img_in, img_out):
+    F = loadPFM(img_in)
+    n = np.empty(shape=F.shape, dtype=np.float32)
 
-indicies,rowPDF,perRowPDF = GenerateSamples(64)
-RenderDiffuseSphere(64, indicies,rowPDF,perRowPDF, False)
+    print("Performing tone mapping")
+    dimmest = 1.0
+    brightest = 0.0
 
-indicies,rowPDF,perRowPDF = GenerateSamples(64)
-RenderDiffuseSphere(64, indicies,rowPDF,perRowPDF, True)
+    height, width, _ = F.shape
+    for y in range(width):
+        for x in range(height):
+            intensity = np.sum(F[x][y])/3.0
+            if (intensity < dimmest and intensity != 0.0):
+                dimmest = intensity
+            if (intensity > brightest):
+                brightest = intensity
 
-indicies,rowPDF,perRowPDF = GenerateSamples(256)
-RenderDiffuseSphere(256, indicies,rowPDF,perRowPDF, False)
+    print("Brightest pixel: ", brightest, " Dimmest pixel: ", dimmest )
 
-indicies,rowPDF,perRowPDF = GenerateSamples(256)
-RenderDiffuseSphere(256, indicies,rowPDF,perRowPDF, True)
+    for y in range(width):
+        for x in range(height):
+            for i in range(0,3):
+                n[x,y,i] = F[x,y,i] / brightest
 
-indicies,rowPDF,perRowPDF = GenerateSamples(1024)
-RenderDiffuseSphere(1024, indicies,rowPDF,perRowPDF, False)
+    writePFM(img_out + ".pfm", n)
+    LoadPFMAndSavePPM(img_out+".pfm",  img_out + ".ppm")
 
-indicies,rowPDF,perRowPDF = GenerateSamples(1024)
-RenderDiffuseSphere(1024, indicies,rowPDF,perRowPDF, True)
+def Exposure(img_in, img_out, stops):
+    print("Performing exposure mapping")
+    scale = np.power(2.0, stops)
+    F = loadPFM(img_in)
+    n = np.empty(shape=F.shape, dtype=np.float32)
 
-#GenerateSamples(256)
-#GenerateSamples(1024)
+    height, width, _ = F.shape
+    for y in range(width):
+        for x in range(height):
+            for i in range(0,3):
+                intensity = F[x,y,i] * scale
+                if(intensity > 1.0):
+                    intensity = 1.0
+                n[x,y,i] = intensity
+
+    writePFM(img_out + ".pfm", n)
+    LoadPFMAndSavePPM(img_out+".pfm",  img_out + ".ppm")
+
+#=========================================================================================================64
+
+numSamples = 64
+#Generate Samples using Environment map
+indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#Generate Sphere without using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+
+#Generate Sphere using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
+LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+
+#=========================================================================================================256
+
+numSamples = 256
+#Generate Samples using Environment map
+indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#Generate Sphere without using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+
+#Generate Sphere using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
+LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+
+#=========================================================================================================1024
+
+numSamples = 1024
+#Generate Samples using Environment map
+indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#Generate Sphere without using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+
+#Generate Sphere using probabilities
+RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
+LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+
+
 if '__main__' == __name__:
     pass
