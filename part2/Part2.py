@@ -182,7 +182,7 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
     radius = 255.5
     sphereWidth = 511
     sphereHeight = 511
-    sphere = np.empty((sphereWidth, sphereHeight, 3), dtype=np.float32)
+    sphere = np.zeros((sphereWidth, sphereHeight, 3), dtype=np.float32)
 
     height, width, _ = img_in.shape
 
@@ -234,11 +234,11 @@ def RenderDiffuseSphere(numberOfSamples, sampledIndices, chooseRowPDF, per_row_p
                 sphere[h,w,:] = np.array([0.0, 0.0, 0.0])
 
     if(useProb):
-        writePFM("part3_with_pxy_"+str(numberOfSamples)+".pfm", sphere)
-        LoadPFMAndSavePPM("part3_with_pxy_"+str(numberOfSamples)+".pfm", "part3_with_pxy_"+str(numberOfSamples)+".ppm")
+        writePFM("spherePxy"+str(numberOfSamples)+".pfm", sphere)
+        LoadPFMAndSavePPM("spherePxy"+str(numberOfSamples)+".pfm", "spherePxy"+str(numberOfSamples)+".ppm")
     else:
-        writePFM("part3_"+str(numberOfSamples)+".pfm", sphere)
-        LoadPFMAndSavePPM("part3_"+str(numberOfSamples)+".pfm", "part3_"+str(numberOfSamples)+".ppm")
+        writePFM("sphere"+str(numberOfSamples)+".pfm", sphere)
+        LoadPFMAndSavePPM("sphere"+str(numberOfSamples)+".pfm", "sphere"+str(numberOfSamples)+".ppm")
 
 def LinearToneMap(img_in, img_out):
     F = loadPFM(img_in)
@@ -287,48 +287,48 @@ def Exposure(img_in, img_out, stops):
 
 #=========================================================================================================64
 
-numSamples = 64
+#numSamples = 64
 #Generate Samples using Environment map
-indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
 #Generate Sphere without using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
-Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
-LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+#Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+#LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
 
 #Generate Sphere using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
-Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
-LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+#Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -15)
+#LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
 
 #=========================================================================================================256
 
-numSamples = 256
+#numSamples = 256
 #Generate Samples using Environment map
-indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
 #Generate Sphere without using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
-Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
-LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+#Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+#LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
 
 #Generate Sphere using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
-Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
-LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+#Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
+#LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
 
 #=========================================================================================================1024
 
 numSamples = 1024
 #Generate Samples using Environment map
-indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
+#indicies,rowPDF,perRowPDF = GenerateSamples(numSamples)
 #Generate Sphere without using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
-Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
-LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, False)
+#Exposure("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expo", -2)
+#LinearToneMap("sphere"+str(numSamples)+".pfm", "sphere"+str(numSamples)+"expotone")
 
 #Generate Sphere using probabilities
-RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
-Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -2)
-LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expotone")
+#RenderDiffuseSphere(numSamples, indicies,rowPDF,perRowPDF, True)
+Exposure("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"expo", -15)
+LinearToneMap("spherePxy"+str(numSamples)+".pfm", "spherePxy"+str(numSamples)+"toneexpotone")
 
 
 if '__main__' == __name__:
